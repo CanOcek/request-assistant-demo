@@ -53,6 +53,7 @@
     "tenantTitle": "Maintenance requests",
     "dashboardTitle": "Ticket dashboard",
     "messages": "Updates",
+    "timeline": "Status timeline",
     "form": {
       "property": "Property",
       "unit": "Unit",
@@ -98,10 +99,14 @@
     }
   },
   "approval": {
+    "listTitle": "Approval requests",
+    "detailTitle": "Approval detail",
     "request": "Request owner approval",
     "pending": "Approval pending",
     "requestError": "Could not request owner approval.",
     "decisionError": "Could not save the approval decision.",
+    "confirmApprove": "Approve this request?",
+    "confirmReject": "Reject this request?",
     "approve": "Approve",
     "reject": "Reject",
     "decision": "Decision",

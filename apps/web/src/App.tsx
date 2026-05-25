@@ -97,6 +97,7 @@ export function App() {
   const [selectedApproval, setSelectedApproval] = useState<ApprovalDetail | null>(null);
   const [form, setForm] = useState<TicketFormState>(emptyForm);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [aiInput, setAiInput] = useState("");
@@ -423,6 +424,9 @@ export function App() {
   async function decideApproval(decision: "approve" | "reject") {
     if (!selectedApproval) return;
 
+    const confirmed = window.confirm(decision === "approve" ? t("approval.confirmApprove") : t("approval.confirmReject"));
+    if (!confirmed) return;
+
     setApprovalError(null);
     setIsSavingApproval(true);
 
@@ -504,6 +508,7 @@ export function App() {
 
     async function loadInitialData() {
       try {
+        setIsLoadingData(true);
         setDataError(null);
         const [propertyResponse, ticketResponse] = await Promise.all([
           request<{ properties: PropertyOption[] }>("/api/properties"),
@@ -528,6 +533,8 @@ export function App() {
         }));
       } catch (error) {
         if (!cancelled) setDataError(error instanceof Error ? error.message : t("common.loadError"));
+      } finally {
+        if (!cancelled) setIsLoadingData(false);
       }
     }
 
@@ -572,7 +579,7 @@ export function App() {
 
       <section className="grid gap-2">
         <Badge variant="secondary" className="w-fit">
-          Sprint D4
+          Sprint D8
         </Badge>
         <h2 className="max-w-3xl text-3xl font-semibold tracking-normal md:text-5xl">{t("app.title")}</h2>
         <p className="max-w-2xl text-base text-muted-foreground md:text-lg">{t("app.subtitle")}</p>
@@ -618,14 +625,16 @@ export function App() {
         {auth.status === "authenticated" ? (
           <Card>
             <CardHeader>
-              <CardTitle>{auth.user.role === "tenant" ? t("tickets.tenantTitle") : t("tickets.dashboardTitle")}</CardTitle>
+              <CardTitle>{getMainCardTitle(auth.user.role, page, t)}</CardTitle>
               <CardDescription>
                 {t("auth.signedInAs", { name: auth.user.name })} · {auth.user.email}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {dataError ? <p className="mb-4 text-sm text-destructive">{dataError}</p> : null}
-              {page === "new-request" && auth.user.role === "tenant" ? (
+              {isLoadingData ? (
+                <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+              ) : page === "new-request" && auth.user.role === "tenant" ? (
                 <TicketForm
                   currentUnitOptions={currentUnitOptions}
                   form={form}
@@ -935,6 +944,13 @@ function TicketForm({
   );
 }
 
+function getMainCardTitle(role: UserRole, page: Page, t: (key: string) => string) {
+  if (page === "approval-detail") return t("approval.detailTitle");
+  if (page === "approvals" || role === "owner") return t("approval.listTitle");
+  if (role === "tenant") return t("tickets.tenantTitle");
+  return t("tickets.dashboardTitle");
+}
+
 function TicketList({
   onOpenTicket,
   t,
@@ -1117,6 +1133,24 @@ function TicketDetailView({
         {ticket.contactDetails ? <DetailRow label={t("tickets.form.contactDetails")} value={ticket.contactDetails} /> : null}
         {ticket.accessDetails ? <DetailRow label={t("tickets.form.accessDetails")} value={ticket.accessDetails} /> : null}
         {ticket.attachmentNote ? <DetailRow label={t("tickets.form.attachmentNote")} value={ticket.attachmentNote} /> : null}
+        {ticket.approvalRequired ? (
+          <DetailRow label={t("approval.decision")} value={t(`approval.status.${ticket.approvalStatus ?? "pending"}`)} />
+        ) : null}
+      </div>
+
+      <div className="grid gap-3 rounded-lg border bg-card p-4">
+        <h4 className="font-semibold">{t("tickets.timeline")}</h4>
+        <div className="grid gap-3">
+          <TimelineItem label={t("ticket.status.submitted")} value={new Date(ticket.createdAt).toLocaleString()} />
+          {ticket.messages.map((message) => (
+            <TimelineItem
+              key={message.id}
+              label={message.message}
+              value={`${message.authorName} · ${new Date(message.createdAt).toLocaleString()}`}
+            />
+          ))}
+          <TimelineItem label={t(`ticket.status.${ticket.status}`)} value={new Date(ticket.updatedAt).toLocaleString()} />
+        </div>
       </div>
 
       {isManager ? (
@@ -1262,6 +1296,18 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     <div className="grid gap-1 text-sm">
       <span className="font-medium">{label}</span>
       <span className="text-muted-foreground">{value}</span>
+    </div>
+  );
+}
+
+function TimelineItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[12px_1fr] gap-3 text-sm">
+      <span className="mt-1 h-3 w-3 rounded-full bg-primary" />
+      <span>
+        <span className="block font-medium">{label}</span>
+        <span className="block text-muted-foreground">{value}</span>
+      </span>
     </div>
   );
 }
