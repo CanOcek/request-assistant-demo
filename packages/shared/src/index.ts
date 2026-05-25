@@ -45,3 +45,21 @@ export type TicketPriority = z.infer<typeof ticketPrioritySchema>;
 export type TicketStatus = z.infer<typeof ticketStatusSchema>;
 export type ApprovalStatus = z.infer<typeof approvalStatusSchema>;
 export type MessageVisibility = z.infer<typeof messageVisibilitySchema>;
+
+export const demoLoginRequestSchema = z.object({
+  role: z.enum(["tenant", "property_manager", "owner"])
+});
+
+export type DemoLoginRequest = z.infer<typeof demoLoginRequestSchema>;
+
+export type DemoUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+};
+
+export type DemoLoginResponse = {
+  token: string;
+  user: DemoUser;
+};

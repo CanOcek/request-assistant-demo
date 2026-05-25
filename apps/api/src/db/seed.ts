@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../env.js";
 import { createDatabaseClient } from "./client.js";
 import { approvals, properties, serviceProviders, ticketMessages, tickets, units, users } from "./schema.js";
 

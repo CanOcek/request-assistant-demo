@@ -15,6 +15,20 @@
     "demoScope": "Demo scope",
     "demoScopeDescription": "The next sprints will turn these placeholders into working request, review, and approval flows."
   },
+  "auth": {
+    "chooseDemoUser": "Choose a demo user",
+    "chooseDemoUserDescription": "Use seeded demo accounts to preview the role-based app shell.",
+    "signedInAs": "Signed in as {{name}}",
+    "roleLandingDescription": "This is the role-specific landing area. Later sprints will replace placeholders with working flows.",
+    "checking": "Checking saved session...",
+    "logout": "Log out",
+    "loginFailed": "Demo login failed"
+  },
+  "database": {
+    "not_configured": "Database not configured",
+    "connected": "Database connected",
+    "error": "Database error"
+  },
   "nav": {
     "newRequest": "New request",
     "myTickets": "My tickets",

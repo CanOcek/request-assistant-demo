@@ -15,6 +15,20 @@
     "demoScope": "Demo-Umfang",
     "demoScopeDescription": "Die naechsten Sprints machen aus diesen Platzhaltern funktionierende Anfrage-, Pruef- und Freigabeablaeufe."
   },
+  "auth": {
+    "chooseDemoUser": "Demo-Nutzer auswaehlen",
+    "chooseDemoUserDescription": "Nutze die vorbereiteten Demo-Konten fuer die rollenbasierte App-Ansicht.",
+    "signedInAs": "Angemeldet als {{name}}",
+    "roleLandingDescription": "Dies ist der rollenbasierte Startbereich. Spaetere Sprints ersetzen die Platzhalter durch echte Ablaeufe.",
+    "checking": "Gespeicherte Sitzung wird geprueft...",
+    "logout": "Abmelden",
+    "loginFailed": "Demo-Login fehlgeschlagen"
+  },
+  "database": {
+    "not_configured": "Datenbank nicht konfiguriert",
+    "connected": "Datenbank verbunden",
+    "error": "Datenbankfehler"
+  },
   "nav": {
     "newRequest": "Neue Anfrage",
     "myTickets": "Meine Tickets",
