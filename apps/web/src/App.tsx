@@ -12,6 +12,8 @@ import {
   type CreateTicketMessageRequest,
   type CreateTicketRequest,
   type AiTicketExtractResponse,
+  type ApprovalDetail,
+  type ApprovalListItem,
   type DemoLoginResponse,
   type DemoUser,
   type HealthResponse,
@@ -46,7 +48,7 @@ type AuthState =
   | { status: "authenticated"; user: DemoUser };
 
 type DemoRole = Extract<UserRole, "tenant" | "property_manager" | "owner">;
-type Page = "new-request" | "tickets" | "ticket-detail";
+type Page = "new-request" | "tickets" | "ticket-detail" | "approvals" | "approval-detail";
 
 type TicketFormState = {
   propertyId: string;
@@ -91,6 +93,8 @@ export function App() {
   const [tickets, setTickets] = useState<TicketListItem[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<TicketDetail | null>(null);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [approvals, setApprovals] = useState<ApprovalListItem[]>([]);
+  const [selectedApproval, setSelectedApproval] = useState<ApprovalDetail | null>(null);
   const [form, setForm] = useState<TicketFormState>(emptyForm);
   const [dataError, setDataError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -110,6 +114,9 @@ export function App() {
   const [messageVisibility, setMessageVisibility] = useState<MessageVisibility>("tenant_visible");
   const [managerError, setManagerError] = useState<string | null>(null);
   const [isSavingManager, setIsSavingManager] = useState(false);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
+  const [decisionNote, setDecisionNote] = useState("");
+  const [isSavingApproval, setIsSavingApproval] = useState(false);
   const healthUrl = useMemo(() => `${apiBaseUrl}/api/health`, []);
 
   const roleSections = [
@@ -177,7 +184,7 @@ export function App() {
 
       window.localStorage.setItem(tokenStorageKey, response.token);
       setAuth({ status: "authenticated", user: response.user });
-      setPage(role === "tenant" ? "new-request" : "tickets");
+      setPage(role === "tenant" ? "new-request" : role === "owner" ? "approvals" : "tickets");
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : t("auth.loginFailed"));
     }
@@ -192,6 +199,8 @@ export function App() {
     setProperties([]);
     setSelectedTicket(null);
     setSelectedTicketId(null);
+    setApprovals([]);
+    setSelectedApproval(null);
     setForm(emptyForm);
   }
 
@@ -226,6 +235,19 @@ export function App() {
     setManagerError(null);
     setSelectedTicketId(ticketId);
     setPage("ticket-detail");
+  }
+
+  async function loadApprovals() {
+    const response = await request<{ approvals: ApprovalListItem[] }>("/api/approvals");
+    setApprovals(response.approvals);
+  }
+
+  async function loadApprovalDetail(approvalId: string) {
+    setApprovalError(null);
+    const response = await request<{ approval: ApprovalDetail }>(`/api/approvals/${approvalId}`);
+    setSelectedApproval(response.approval);
+    setDecisionNote(response.approval.decisionNote ?? "");
+    setPage("approval-detail");
   }
 
   function updateForm<K extends keyof TicketFormState>(key: K, value: TicketFormState[K]) {
@@ -383,6 +405,41 @@ export function App() {
     }
   }
 
+  async function requestOwnerApproval(ticketId: string) {
+    setManagerError(null);
+    setIsSavingManager(true);
+
+    try {
+      await request<{ id: string }>(`/api/tickets/${ticketId}/approval-request`, { method: "POST" });
+      await loadTickets();
+      await loadTicketDetail(ticketId);
+    } catch (error) {
+      setManagerError(error instanceof Error ? error.message : t("approval.requestError"));
+    } finally {
+      setIsSavingManager(false);
+    }
+  }
+
+  async function decideApproval(decision: "approve" | "reject") {
+    if (!selectedApproval) return;
+
+    setApprovalError(null);
+    setIsSavingApproval(true);
+
+    try {
+      await request<{ id: string; status: string }>(`/api/approvals/${selectedApproval.id}/${decision}`, {
+        method: "POST",
+        body: JSON.stringify({ decisionNote: decisionNote.trim() || undefined })
+      });
+      await loadApprovals();
+      await loadApprovalDetail(selectedApproval.id);
+    } catch (error) {
+      setApprovalError(error instanceof Error ? error.message : t("approval.decisionError"));
+    } finally {
+      setIsSavingApproval(false);
+    }
+  }
+
   useEffect(() => {
     const controller = new AbortController();
 
@@ -425,7 +482,7 @@ export function App() {
         const response = await request<{ user: DemoUser }>("/api/me");
         if (!cancelled) {
           setAuth({ status: "authenticated", user: response.user });
-          setPage(response.user.role === "tenant" ? "new-request" : "tickets");
+          setPage(response.user.role === "tenant" ? "new-request" : response.user.role === "owner" ? "approvals" : "tickets");
         }
       } catch {
         window.localStorage.removeItem(tokenStorageKey);
@@ -452,11 +509,16 @@ export function App() {
           request<{ properties: PropertyOption[] }>("/api/properties"),
           request<{ tickets: TicketListItem[] }>("/api/tickets")
         ]);
+        const approvalResponse =
+          auth.status === "authenticated" && auth.user.role !== "tenant"
+            ? await request<{ approvals: ApprovalListItem[] }>("/api/approvals")
+            : { approvals: [] };
 
         if (cancelled) return;
 
         setProperties(propertyResponse.properties);
         setTickets(ticketResponse.tickets);
+        setApprovals(approvalResponse.approvals);
 
         const firstProperty = propertyResponse.properties[0];
         setForm((current) => ({
@@ -536,6 +598,19 @@ export function App() {
             <ListChecks className="h-4 w-4" />
             {auth.user.role === "tenant" ? t("nav.myTickets") : t("nav.managerDashboard")}
           </Button>
+          {auth.user.role === "owner" ? (
+            <Button
+              variant={page === "approvals" || page === "approval-detail" ? "default" : "outline"}
+              onClick={() => {
+                setPage("approvals");
+                setSelectedApproval(null);
+                void loadApprovals();
+              }}
+            >
+              <ShieldCheck className="h-4 w-4" />
+              {t("nav.approvals")}
+            </Button>
+          ) : null}
         </div>
       ) : null}
 
@@ -567,6 +642,20 @@ export function App() {
                   t={t}
                   updateForm={updateForm}
                 />
+              ) : page === "approval-detail" && selectedApproval ? (
+                <ApprovalDetailView
+                  approval={selectedApproval}
+                  approvalError={approvalError}
+                  decisionNote={decisionNote}
+                  isSavingApproval={isSavingApproval}
+                  onDecisionNoteChange={setDecisionNote}
+                  onApprove={() => void decideApproval("approve")}
+                  onReject={() => void decideApproval("reject")}
+                  role={auth.user.role}
+                  t={t}
+                />
+              ) : page === "approvals" && auth.user.role === "owner" ? (
+                <ApprovalList approvals={approvals} onOpenApproval={(approvalId) => void loadApprovalDetail(approvalId)} t={t} />
               ) : page === "ticket-detail" && selectedTicket ? (
                 <TicketDetailView
                   isSavingManager={isSavingManager}
@@ -577,6 +666,7 @@ export function App() {
                   onAddMessage={() => void addTicketMessage()}
                   onMessageChange={setMessageDraft}
                   onMessageVisibilityChange={setMessageVisibility}
+                  onRequestApproval={() => void requestOwnerApproval(selectedTicket.id)}
                   onSaveManager={() => void saveManagerTicket()}
                   onUpdateManagerDraft={updateManagerDraft}
                   role={auth.user.role}
@@ -982,6 +1072,7 @@ function TicketDetailView({
   onAddMessage,
   onMessageChange,
   onMessageVisibilityChange,
+  onRequestApproval,
   onSaveManager,
   onUpdateManagerDraft,
   role,
@@ -996,6 +1087,7 @@ function TicketDetailView({
   onAddMessage: () => void;
   onMessageChange: (value: string) => void;
   onMessageVisibilityChange: (value: MessageVisibility) => void;
+  onRequestApproval: () => void;
   onSaveManager: () => void;
   onUpdateManagerDraft: <K extends keyof UpdateTicketRequest>(key: K, value: UpdateTicketRequest[K]) => void;
   role: UserRole;
@@ -1135,9 +1227,14 @@ function TicketDetailView({
             </div>
           </div>
           {managerError ? <p className="text-sm text-destructive">{managerError}</p> : null}
-          <Button className="w-fit" disabled={isSavingManager} onClick={onSaveManager} type="button">
-            {isSavingManager ? t("manager.saving") : t("manager.saveTicket")}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={isSavingManager} onClick={onSaveManager} type="button">
+              {isSavingManager ? t("manager.saving") : t("manager.saveTicket")}
+            </Button>
+            <Button disabled={isSavingManager || ticket.approvalStatus === "pending"} onClick={onRequestApproval} type="button" variant="outline">
+              {ticket.approvalStatus === "pending" ? t("approval.pending") : t("approval.request")}
+            </Button>
+          </div>
         </div>
       ) : null}
 
@@ -1165,6 +1262,128 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     <div className="grid gap-1 text-sm">
       <span className="font-medium">{label}</span>
       <span className="text-muted-foreground">{value}</span>
+    </div>
+  );
+}
+
+function ApprovalList({
+  approvals,
+  onOpenApproval,
+  t
+}: {
+  approvals: ApprovalListItem[];
+  onOpenApproval: (approvalId: string) => void;
+  t: (key: string) => string;
+}) {
+  if (!approvals.length) {
+    return <p className="text-sm text-muted-foreground">{t("common.empty")}</p>;
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{t("tickets.table.ticket")}</TableHead>
+          <TableHead>{t("tickets.table.priority")}</TableHead>
+          <TableHead>{t("tickets.table.status")}</TableHead>
+          <TableHead>{t("tickets.table.action")}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {approvals.map((approval) => (
+          <TableRow key={approval.id}>
+            <TableCell>
+              <div className="grid gap-1">
+                <span className="font-medium">{approval.ticketTitle}</span>
+                <span className="text-xs text-muted-foreground">
+                  {approval.propertyName}
+                  {approval.unitLabel ? ` · ${approval.unitLabel}` : ""}
+                </span>
+              </div>
+            </TableCell>
+            <TableCell>
+              <Badge variant={approval.priority === "urgent" ? "urgent" : "outline"}>{t(`ticket.priority.${approval.priority}`)}</Badge>
+            </TableCell>
+            <TableCell>
+              <Badge variant="secondary">{t(`approval.status.${approval.status}`)}</Badge>
+            </TableCell>
+            <TableCell>
+              <Button size="sm" variant="outline" onClick={() => onOpenApproval(approval.id)}>
+                {t("tickets.table.open")}
+              </Button>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+function ApprovalDetailView({
+  approval,
+  approvalError,
+  decisionNote,
+  isSavingApproval,
+  onApprove,
+  onDecisionNoteChange,
+  onReject,
+  role,
+  t
+}: {
+  approval: ApprovalDetail;
+  approvalError: string | null;
+  decisionNote: string;
+  isSavingApproval: boolean;
+  onApprove: () => void;
+  onDecisionNoteChange: (value: string) => void;
+  onReject: () => void;
+  role: UserRole;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="grid gap-5">
+      <div className="grid gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="secondary">{t(`approval.status.${approval.status}`)}</Badge>
+          <Badge variant={approval.priority === "urgent" ? "urgent" : "outline"}>{t(`ticket.priority.${approval.priority}`)}</Badge>
+          <Badge variant="outline">{t(`ticket.category.${approval.category}`)}</Badge>
+        </div>
+        <h3 className="text-2xl font-semibold">{approval.ticketTitle}</h3>
+        <p className="text-sm text-muted-foreground">
+          {approval.propertyName}
+          {approval.unitLabel ? ` · ${approval.unitLabel}` : ""} · {new Date(approval.createdAt).toLocaleString()}
+        </p>
+      </div>
+
+      <div className="grid gap-3 rounded-lg border bg-muted/30 p-4">
+        <p>{approval.ticketDescription}</p>
+        {approval.roomOrLocation ? <DetailRow label={t("tickets.form.location")} value={approval.roomOrLocation} /> : null}
+        {approval.attachmentNote ? <DetailRow label={t("tickets.form.attachmentNote")} value={approval.attachmentNote} /> : null}
+        <DetailRow label={t("approval.requestedBy")} value={approval.managerName} />
+      </div>
+
+      {role === "owner" && approval.status === "pending" ? (
+        <div className="grid gap-3 rounded-lg border bg-card p-4">
+          <label className="grid gap-2 text-sm font-medium">
+            {t("approval.decisionNote")}
+            <Textarea value={decisionNote} onChange={(event) => onDecisionNoteChange(event.target.value)} />
+          </label>
+          {approvalError ? <p className="text-sm text-destructive">{approvalError}</p> : null}
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={isSavingApproval} onClick={onApprove} type="button">
+              {t("approval.approve")}
+            </Button>
+            <Button disabled={isSavingApproval} onClick={onReject} type="button" variant="outline">
+              {t("approval.reject")}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-2 rounded-lg border bg-muted/30 p-4">
+          <DetailRow label={t("approval.decision")} value={t(`approval.status.${approval.status}`)} />
+          {approval.decisionNote ? <DetailRow label={t("approval.decisionNote")} value={approval.decisionNote} /> : null}
+        </div>
+      )}
     </div>
   );
 }

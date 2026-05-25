@@ -97,6 +97,22 @@
       "all": "All"
     }
   },
+  "approval": {
+    "request": "Request owner approval",
+    "pending": "Approval pending",
+    "requestError": "Could not request owner approval.",
+    "decisionError": "Could not save the approval decision.",
+    "approve": "Approve",
+    "reject": "Reject",
+    "decision": "Decision",
+    "decisionNote": "Decision note",
+    "requestedBy": "Requested by",
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    }
+  },
   "message": {
     "visibility": {
       "internal": "Internal",

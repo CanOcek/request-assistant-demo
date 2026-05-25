@@ -4,6 +4,7 @@ import { and, desc, eq } from "drizzle-orm";
 import express from "express";
 import {
   aiTicketExtractRequestSchema,
+  approvalDecisionRequestSchema,
   createTicketMessageRequestSchema,
   createTicketRequestSchema,
   demoLoginRequestSchema,
@@ -11,6 +12,8 @@ import {
   ticketPrioritySchema,
   ticketStatusSchema,
   updateTicketRequestSchema,
+  type ApprovalDetail,
+  type ApprovalListItem,
   type CreateTicketMessageRequest,
   type DemoLoginResponse,
   type DemoUser,
@@ -27,7 +30,7 @@ import {
 import { extractTicketFields } from "./ai/ticketExtraction.js";
 import { createDemoToken, verifyDemoToken } from "./auth/token.js";
 import { createDatabaseClient, hasDatabaseUrl } from "./db/client.js";
-import { properties, ticketMessages, tickets, units, users } from "./db/schema.js";
+import { approvals, properties, ticketMessages, tickets, units, users } from "./db/schema.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
@@ -654,6 +657,306 @@ app.post("/api/tickets/:ticketId/messages", async (req, res) => {
   } catch (error) {
     res.status(503).json({ message: error instanceof Error ? error.message : "Message creation unavailable." });
   }
+});
+
+app.post("/api/tickets/:ticketId/approval-request", async (req, res) => {
+  const user = requireAuth(req, res);
+  if (!user) return;
+
+  if (!canWriteTicket(user)) {
+    res.status(403).json({ message: "Only Hausverwaltung demo users can request approval." });
+    return;
+  }
+
+  try {
+    requireDatabase();
+    const { client, db } = createDatabaseClient();
+
+    try {
+      const [ticket] = await db
+        .select({
+          id: tickets.id,
+          ownerUserId: units.ownerUserId
+        })
+        .from(tickets)
+        .leftJoin(units, eq(tickets.unitId, units.id))
+        .where(eq(tickets.id, req.params.ticketId))
+        .limit(1);
+
+      if (!ticket) {
+        res.status(404).json({ message: "Ticket not found." });
+        return;
+      }
+
+      if (!ticket.ownerUserId) {
+        res.status(400).json({ message: "Ticket has no owner assigned through its unit." });
+        return;
+      }
+
+      const [existing] = await db
+        .select({ id: approvals.id })
+        .from(approvals)
+        .where(and(eq(approvals.ticketId, ticket.id), eq(approvals.status, "pending")))
+        .limit(1);
+
+      if (existing) {
+        res.json({ id: existing.id });
+        return;
+      }
+
+      const [created] = await db
+        .insert(approvals)
+        .values({
+          ticketId: ticket.id,
+          requestedByUserId: user.id,
+          ownerUserId: ticket.ownerUserId,
+          status: "pending"
+        })
+        .returning({ id: approvals.id });
+
+      await db
+        .update(tickets)
+        .set({
+          approvalRequired: true,
+          approvalStatus: "pending",
+          status: "waiting_for_owner_approval",
+          updatedAt: new Date()
+        })
+        .where(eq(tickets.id, ticket.id));
+
+      await db.insert(ticketMessages).values({
+        ticketId: ticket.id,
+        authorUserId: user.id,
+        message: "Owner approval requested.",
+        visibility: "all"
+      });
+
+      res.status(201).json({ id: created.id });
+    } finally {
+      await client.end();
+    }
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Approval request unavailable." });
+  }
+});
+
+app.get("/api/approvals", async (req, res) => {
+  const user = requireAuth(req, res);
+  if (!user) return;
+
+  try {
+    requireDatabase();
+    const { client, db } = createDatabaseClient();
+
+    try {
+      const conditions = [];
+      if (user.role === "owner") conditions.push(eq(approvals.ownerUserId, user.id));
+      if (user.role === "property_manager") conditions.push(eq(approvals.requestedByUserId, user.id));
+
+      const rows = await db
+        .select({
+          id: approvals.id,
+          ticketId: approvals.ticketId,
+          ticketTitle: tickets.title,
+          ticketDescription: tickets.description,
+          propertyName: properties.name,
+          unitLabel: units.label,
+          category: tickets.category,
+          priority: tickets.priority,
+          status: approvals.status,
+          createdAt: approvals.createdAt,
+          decidedAt: approvals.decidedAt
+        })
+        .from(approvals)
+        .innerJoin(tickets, eq(approvals.ticketId, tickets.id))
+        .innerJoin(properties, eq(tickets.propertyId, properties.id))
+        .leftJoin(units, eq(tickets.unitId, units.id))
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(approvals.createdAt));
+
+      const mapped: ApprovalListItem[] = rows.map((row) => ({
+        ...row,
+        createdAt: row.createdAt.toISOString(),
+        decidedAt: row.decidedAt ? row.decidedAt.toISOString() : null
+      }));
+
+      res.json({ approvals: mapped });
+    } finally {
+      await client.end();
+    }
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Approvals unavailable." });
+  }
+});
+
+app.get("/api/approvals/:approvalId", async (req, res) => {
+  const user = requireAuth(req, res);
+  if (!user) return;
+
+  try {
+    requireDatabase();
+    const { client, db } = createDatabaseClient();
+
+    try {
+      const [row] = await db
+        .select({
+          id: approvals.id,
+          ticketId: approvals.ticketId,
+          ticketTitle: tickets.title,
+          ticketDescription: tickets.description,
+          propertyName: properties.name,
+          unitLabel: units.label,
+          category: tickets.category,
+          priority: tickets.priority,
+          status: approvals.status,
+          createdAt: approvals.createdAt,
+          decidedAt: approvals.decidedAt,
+          ticketStatus: tickets.status,
+          roomOrLocation: tickets.roomOrLocation,
+          attachmentNote: tickets.attachmentNote,
+          managerName: users.name,
+          ownerName: users.name,
+          decisionNote: approvals.decisionNote,
+          ownerUserId: approvals.ownerUserId,
+          requestedByUserId: approvals.requestedByUserId
+        })
+        .from(approvals)
+        .innerJoin(tickets, eq(approvals.ticketId, tickets.id))
+        .innerJoin(properties, eq(tickets.propertyId, properties.id))
+        .leftJoin(units, eq(tickets.unitId, units.id))
+        .innerJoin(users, eq(approvals.requestedByUserId, users.id))
+        .where(eq(approvals.id, req.params.approvalId))
+        .limit(1);
+
+      if (!row) {
+        res.status(404).json({ message: "Approval not found." });
+        return;
+      }
+
+      if (user.role === "owner" && row.ownerUserId !== user.id) {
+        res.status(403).json({ message: "You cannot view this approval." });
+        return;
+      }
+
+      if (user.role === "tenant") {
+        res.status(403).json({ message: "Tenants cannot view approval requests in this demo." });
+        return;
+      }
+
+      const [owner] = await db.select({ name: users.name }).from(users).where(eq(users.id, row.ownerUserId)).limit(1);
+
+      const detail: ApprovalDetail = {
+        id: row.id,
+        ticketId: row.ticketId,
+        ticketTitle: row.ticketTitle,
+        ticketDescription: row.ticketDescription,
+        propertyName: row.propertyName,
+        unitLabel: row.unitLabel,
+        category: row.category,
+        priority: row.priority,
+        status: row.status,
+        createdAt: row.createdAt.toISOString(),
+        decidedAt: row.decidedAt ? row.decidedAt.toISOString() : null,
+        ticketStatus: row.ticketStatus,
+        roomOrLocation: row.roomOrLocation,
+        attachmentNote: row.attachmentNote,
+        managerName: row.managerName,
+        ownerName: owner?.name ?? "Owner",
+        decisionNote: row.decisionNote
+      };
+
+      res.json({ approval: detail });
+    } finally {
+      await client.end();
+    }
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Approval unavailable." });
+  }
+});
+
+async function decideApproval(req: express.Request, res: express.Response, decision: "approved" | "rejected") {
+  const user = requireAuth(req, res);
+  if (!user) return;
+  const approvalId = String(req.params.approvalId);
+
+  if (user.role !== "owner") {
+    res.status(403).json({ message: "Only owner demo users can decide approvals." });
+    return;
+  }
+
+  const parsed = approvalDecisionRequestSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    res.status(400).json({ message: "Invalid approval decision.", issues: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  try {
+    requireDatabase();
+    const { client, db } = createDatabaseClient();
+
+    try {
+      const [approval] = await db
+        .select({
+          id: approvals.id,
+          ticketId: approvals.ticketId,
+          ownerUserId: approvals.ownerUserId,
+          status: approvals.status
+        })
+        .from(approvals)
+        .where(eq(approvals.id, approvalId))
+        .limit(1);
+
+      if (!approval) {
+        res.status(404).json({ message: "Approval not found." });
+        return;
+      }
+
+      if (approval.ownerUserId !== user.id) {
+        res.status(403).json({ message: "You cannot decide this approval." });
+        return;
+      }
+
+      await db
+        .update(approvals)
+        .set({
+          status: decision,
+          decisionNote: parsed.data.decisionNote,
+          decidedAt: new Date()
+        })
+        .where(eq(approvals.id, approval.id));
+
+      await db
+        .update(tickets)
+        .set({
+          approvalStatus: decision,
+          status: decision === "approved" ? "approved" : "rejected",
+          updatedAt: new Date()
+        })
+        .where(eq(tickets.id, approval.ticketId));
+
+      await db.insert(ticketMessages).values({
+        ticketId: approval.ticketId,
+        authorUserId: user.id,
+        message: decision === "approved" ? "Owner approved the request." : "Owner rejected the request.",
+        visibility: "all"
+      });
+
+      res.json({ id: approval.id, status: decision });
+    } finally {
+      await client.end();
+    }
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Approval decision unavailable." });
+  }
+}
+
+app.post("/api/approvals/:approvalId/approve", (req, res) => {
+  void decideApproval(req, res, "approved");
+});
+
+app.post("/api/approvals/:approvalId/reject", (req, res) => {
+  void decideApproval(req, res, "rejected");
 });
 
 app.listen(port, () => {

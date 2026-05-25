@@ -167,3 +167,32 @@ export const aiTicketExtractResponseSchema = z.object({
 });
 
 export type AiTicketExtractResponse = z.infer<typeof aiTicketExtractResponseSchema>;
+
+export const approvalDecisionRequestSchema = z.object({
+  decisionNote: z.string().max(1000).optional()
+});
+
+export type ApprovalDecisionRequest = z.infer<typeof approvalDecisionRequestSchema>;
+
+export type ApprovalListItem = {
+  id: string;
+  ticketId: string;
+  ticketTitle: string;
+  ticketDescription: string;
+  propertyName: string;
+  unitLabel: string | null;
+  category: TicketCategory;
+  priority: TicketPriority;
+  status: ApprovalStatus;
+  createdAt: string;
+  decidedAt: string | null;
+};
+
+export type ApprovalDetail = ApprovalListItem & {
+  ticketStatus: TicketStatus;
+  roomOrLocation: string | null;
+  attachmentNote: string | null;
+  managerName: string;
+  ownerName: string;
+  decisionNote: string | null;
+};

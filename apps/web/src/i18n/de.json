@@ -97,6 +97,22 @@
       "all": "Alle"
     }
   },
+  "approval": {
+    "request": "Eigentuemerfreigabe anfordern",
+    "pending": "Freigabe ausstehend",
+    "requestError": "Eigentuemerfreigabe konnte nicht angefordert werden.",
+    "decisionError": "Freigabeentscheidung konnte nicht gespeichert werden.",
+    "approve": "Freigeben",
+    "reject": "Ablehnen",
+    "decision": "Entscheidung",
+    "decisionNote": "Entscheidungsnotiz",
+    "requestedBy": "Angefordert von",
+    "status": {
+      "pending": "Ausstehend",
+      "approved": "Freigegeben",
+      "rejected": "Abgelehnt"
+    }
+  },
   "message": {
     "visibility": {
       "internal": "Intern",
