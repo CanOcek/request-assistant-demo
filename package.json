@@ -1,0 +1,15 @@
+{
+  "name": "request-assistant-demo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace @request-assistant/web run dev",
+    "dev:api": "npm --workspace @request-assistant/api run dev",
+    "build": "npm --workspace @request-assistant/shared run build && npm --workspace @request-assistant/api run build && npm --workspace @request-assistant/web run build",
+    "check": "npm --workspace @request-assistant/shared run build && npm --workspace @request-assistant/api run check && npm --workspace @request-assistant/web run check && npm --workspace @request-assistant/shared run check"
+  }
+}
