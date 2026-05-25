@@ -1,0 +1,77 @@
+{
+  "app": {
+    "eyebrow": "Assistent fuer Instandhaltungsanfragen",
+    "title": "Request Assistant",
+    "subtitle": "Demo-Grundgeruest fuer Mieteranfragen, Pruefung durch die Hausverwaltung und Freigaben durch Eigentuemer.",
+    "language": "Sprache",
+    "english": "Englisch",
+    "german": "Deutsch",
+    "backendStatus": "Backend-Status",
+    "connected": "Verbunden",
+    "checking": "Pruefe...",
+    "offline": "Offline",
+    "connectedTo": "Verbunden mit {{service}} um {{time}}.",
+    "calling": "Rufe {{url}} auf",
+    "demoScope": "Demo-Umfang",
+    "demoScopeDescription": "Die naechsten Sprints machen aus diesen Platzhaltern funktionierende Anfrage-, Pruef- und Freigabeablaeufe."
+  },
+  "nav": {
+    "newRequest": "Neue Anfrage",
+    "myTickets": "Meine Tickets",
+    "managerDashboard": "Verwaltungsdashboard",
+    "approvals": "Freigaben",
+    "admin": "Admin-Einrichtung"
+  },
+  "roles": {
+    "tenant": "Mieter",
+    "manager": "Hausverwaltung",
+    "owner": "Eigentuemer",
+    "admin": "Admin",
+    "tenantDescription": "Schaeden melden, Details ergaenzen und Fortschritt verfolgen.",
+    "managerDescription": "Tickets pruefen, priorisieren, aktualisieren und Freigaben anfordern.",
+    "ownerDescription": "Freigabeanfragen pruefen und Entscheidungen treffen.",
+    "adminDescription": "Demo-Objekte, Einheiten, Nutzer und Kontakte verwalten."
+  },
+  "ticket": {
+    "status": {
+      "draft": "Entwurf",
+      "submitted": "Eingereicht",
+      "needs_more_information": "Weitere Informationen noetig",
+      "under_review": "In Pruefung",
+      "waiting_for_owner_approval": "Wartet auf Eigentuemerfreigabe",
+      "approved": "Freigegeben",
+      "rejected": "Abgelehnt",
+      "assigned": "Zugewiesen",
+      "in_progress": "In Bearbeitung",
+      "resolved": "Geloest",
+      "closed": "Geschlossen",
+      "cancelled": "Abgebrochen"
+    },
+    "priority": {
+      "low": "Niedrig",
+      "medium": "Mittel",
+      "high": "Hoch",
+      "urgent": "Dringend"
+    },
+    "category": {
+      "heating": "Heizung",
+      "water_damage": "Wasserschaden",
+      "internet_tv": "Internet/TV",
+      "electricity": "Strom",
+      "cleaning": "Reinigung",
+      "access": "Zugang",
+      "noise": "Laerm",
+      "general_repair": "Allgemeine Reparatur",
+      "other": "Sonstiges"
+    }
+  },
+  "common": {
+    "openPreview": "Vorschau oeffnen",
+    "close": "Schliessen",
+    "placeholder": "Platzhalter",
+    "page": "Seite",
+    "role": "Rolle",
+    "purpose": "Zweck",
+    "empty": "Noch keine Eintraege"
+  }
+}

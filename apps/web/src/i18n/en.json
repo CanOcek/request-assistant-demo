@@ -1,0 +1,77 @@
+{
+  "app": {
+    "eyebrow": "Maintenance request assistant",
+    "title": "Request Assistant",
+    "subtitle": "Demo shell for tenant request intake, Hausverwaltung review, and owner approvals.",
+    "language": "Language",
+    "english": "English",
+    "german": "German",
+    "backendStatus": "Backend status",
+    "connected": "Connected",
+    "checking": "Checking...",
+    "offline": "Offline",
+    "connectedTo": "Connected to {{service}} at {{time}}.",
+    "calling": "Calling {{url}}",
+    "demoScope": "Demo scope",
+    "demoScopeDescription": "The next sprints will turn these placeholders into working request, review, and approval flows."
+  },
+  "nav": {
+    "newRequest": "New request",
+    "myTickets": "My tickets",
+    "managerDashboard": "Manager dashboard",
+    "approvals": "Approvals",
+    "admin": "Admin setup"
+  },
+  "roles": {
+    "tenant": "Tenant",
+    "manager": "Hausverwaltung",
+    "owner": "Owner",
+    "admin": "Admin",
+    "tenantDescription": "Submit repair issues, add details, and track progress.",
+    "managerDescription": "Review, prioritize, update, and request approvals.",
+    "ownerDescription": "Review approval requests and make decisions.",
+    "adminDescription": "Manage demo properties, units, users, and contacts."
+  },
+  "ticket": {
+    "status": {
+      "draft": "Draft",
+      "submitted": "Submitted",
+      "needs_more_information": "Needs more information",
+      "under_review": "Under review",
+      "waiting_for_owner_approval": "Waiting for owner approval",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "assigned": "Assigned",
+      "in_progress": "In progress",
+      "resolved": "Resolved",
+      "closed": "Closed",
+      "cancelled": "Cancelled"
+    },
+    "priority": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "urgent": "Urgent"
+    },
+    "category": {
+      "heating": "Heating",
+      "water_damage": "Water damage",
+      "internet_tv": "Internet/TV",
+      "electricity": "Electricity",
+      "cleaning": "Cleaning",
+      "access": "Access",
+      "noise": "Noise",
+      "general_repair": "General repair",
+      "other": "Other"
+    }
+  },
+  "common": {
+    "openPreview": "Open preview",
+    "close": "Close",
+    "placeholder": "Placeholder",
+    "page": "Page",
+    "role": "Role",
+    "purpose": "Purpose",
+    "empty": "No records yet"
+  }
+}

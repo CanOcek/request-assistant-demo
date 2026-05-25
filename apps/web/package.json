@@ -10,9 +10,21 @@
     "check": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-tabs": "^1.1.13",
     "@request-assistant/shared": "file:../../packages/shared",
+    "autoprefixer": "^10.5.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "i18next": "^26.2.0",
+    "lucide-react": "^1.16.0",
+    "postcss": "^8.5.15",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "react-i18next": "^17.0.8",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^3.4.17"
   },
   "devDependencies": {
     "@types/react": "^19.1.5",
