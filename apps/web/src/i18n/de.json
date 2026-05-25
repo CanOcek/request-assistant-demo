@@ -67,6 +67,31 @@
       "open": "Oeffnen"
     }
   },
+  "manager": {
+    "editTitle": "Pruefung durch Verwaltung",
+    "saveTicket": "Ticket speichern",
+    "saving": "Speichert...",
+    "addUpdate": "Update hinzufuegen",
+    "validationError": "Bitte pruefe die Ticket-Felder.",
+    "saveError": "Das Ticket konnte nicht gespeichert werden.",
+    "messageValidationError": "Bitte gib eine Update-Nachricht ein.",
+    "messageSaveError": "Das Update konnte nicht hinzugefuegt werden.",
+    "filters": {
+      "status": "Status",
+      "priority": "Prioritaet",
+      "category": "Kategorie",
+      "property": "Objekt",
+      "all": "Alle"
+    }
+  },
+  "message": {
+    "visibility": {
+      "internal": "Intern",
+      "tenant_visible": "Fuer Mieter sichtbar",
+      "owner_visible": "Fuer Eigentuemer sichtbar",
+      "all": "Alle Nutzer"
+    }
+  },
   "roles": {
     "tenant": "Mieter",
     "manager": "Hausverwaltung",

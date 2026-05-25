@@ -67,6 +67,31 @@
       "open": "Open"
     }
   },
+  "manager": {
+    "editTitle": "Manager review",
+    "saveTicket": "Save ticket",
+    "saving": "Saving...",
+    "addUpdate": "Add update",
+    "validationError": "Please check the ticket fields.",
+    "saveError": "Could not save the ticket.",
+    "messageValidationError": "Please enter an update message.",
+    "messageSaveError": "Could not add the update.",
+    "filters": {
+      "status": "Status",
+      "priority": "Priority",
+      "category": "Category",
+      "property": "Property",
+      "all": "All"
+    }
+  },
+  "message": {
+    "visibility": {
+      "internal": "Internal",
+      "tenant_visible": "Tenant-visible",
+      "owner_visible": "Owner-visible",
+      "all": "All users"
+    }
+  },
   "roles": {
     "tenant": "Tenant",
     "manager": "Hausverwaltung",

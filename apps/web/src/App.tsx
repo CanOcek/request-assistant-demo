@@ -1,18 +1,26 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   appName,
   createTicketRequestSchema,
+  createTicketMessageRequestSchema,
+  messageVisibilitySchema,
   ticketCategorySchema,
   ticketPrioritySchema,
+  ticketStatusSchema,
+  updateTicketRequestSchema,
+  type CreateTicketMessageRequest,
   type CreateTicketRequest,
   type DemoLoginResponse,
   type DemoUser,
   type HealthResponse,
+  type MessageVisibility,
   type PropertyOption,
   type TicketCategory,
   type TicketDetail,
   type TicketListItem,
   type TicketPriority,
+  type TicketStatus,
+  type UpdateTicketRequest,
   type UserRole
 } from "@request-assistant/shared";
 import { Building2, ClipboardList, Languages, ListChecks, LogOut, Plus, ShieldCheck, Wrench } from "lucide-react";
@@ -55,6 +63,8 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 const tokenStorageKey = "request-assistant-demo-token";
 const categories = ticketCategorySchema.options;
 const priorities = ticketPrioritySchema.options;
+const statuses = ticketStatusSchema.options;
+const messageVisibilities = messageVisibilitySchema.options;
 
 const emptyForm: TicketFormState = {
   propertyId: "",
@@ -83,6 +93,17 @@ export function App() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [filters, setFilters] = useState({
+    status: "all",
+    priority: "all",
+    category: "all",
+    propertyId: "all"
+  });
+  const [managerDraft, setManagerDraft] = useState<UpdateTicketRequest>({});
+  const [messageDraft, setMessageDraft] = useState("");
+  const [messageVisibility, setMessageVisibility] = useState<MessageVisibility>("tenant_visible");
+  const [managerError, setManagerError] = useState<string | null>(null);
+  const [isSavingManager, setIsSavingManager] = useState(false);
   const healthUrl = useMemo(() => `${apiBaseUrl}/api/health`, []);
 
   const roleSections = [
@@ -168,8 +189,16 @@ export function App() {
     setForm(emptyForm);
   }
 
-  async function loadTickets() {
-    const response = await request<{ tickets: TicketListItem[] }>("/api/tickets");
+  async function loadTickets(nextFilters = filters) {
+    const params = new URLSearchParams();
+
+    if (nextFilters.status !== "all") params.set("status", nextFilters.status);
+    if (nextFilters.priority !== "all") params.set("priority", nextFilters.priority);
+    if (nextFilters.category !== "all") params.set("category", nextFilters.category);
+    if (nextFilters.propertyId !== "all") params.set("propertyId", nextFilters.propertyId);
+
+    const query = params.toString();
+    const response = await request<{ tickets: TicketListItem[] }>(`/api/tickets${query ? `?${query}` : ""}`);
     setTickets(response.tickets);
   }
 
@@ -177,6 +206,18 @@ export function App() {
     setDataError(null);
     const response = await request<{ ticket: TicketDetail }>(`/api/tickets/${ticketId}`);
     setSelectedTicket(response.ticket);
+    setManagerDraft({
+      status: response.ticket.status,
+      category: response.ticket.category,
+      priority: response.ticket.priority,
+      roomOrLocation: response.ticket.roomOrLocation ?? "",
+      contactDetails: response.ticket.contactDetails ?? "",
+      accessDetails: response.ticket.accessDetails ?? "",
+      attachmentNote: response.ticket.attachmentNote ?? ""
+    });
+    setMessageDraft("");
+    setMessageVisibility("tenant_visible");
+    setManagerError(null);
     setSelectedTicketId(ticketId);
     setPage("ticket-detail");
   }
@@ -231,6 +272,74 @@ export function App() {
       setFormError(error instanceof Error ? error.message : t("tickets.form.submitError"));
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  function updateFilter(key: keyof typeof filters, value: string) {
+    const nextFilters = { ...filters, [key]: value };
+    setFilters(nextFilters);
+    void loadTickets(nextFilters);
+  }
+
+  function updateManagerDraft<K extends keyof UpdateTicketRequest>(key: K, value: UpdateTicketRequest[K]) {
+    setManagerDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  async function saveManagerTicket() {
+    if (!selectedTicket) return;
+
+    const parsed = updateTicketRequestSchema.safeParse(managerDraft);
+
+    if (!parsed.success) {
+      setManagerError(t("manager.validationError"));
+      return;
+    }
+
+    setIsSavingManager(true);
+    setManagerError(null);
+
+    try {
+      await request<{ id: string }>(`/api/tickets/${selectedTicket.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(parsed.data)
+      });
+      await loadTickets();
+      await loadTicketDetail(selectedTicket.id);
+    } catch (error) {
+      setManagerError(error instanceof Error ? error.message : t("manager.saveError"));
+    } finally {
+      setIsSavingManager(false);
+    }
+  }
+
+  async function addTicketMessage() {
+    if (!selectedTicket) return;
+
+    const body: CreateTicketMessageRequest = {
+      message: messageDraft.trim(),
+      visibility: messageVisibility
+    };
+    const parsed = createTicketMessageRequestSchema.safeParse(body);
+
+    if (!parsed.success) {
+      setManagerError(t("manager.messageValidationError"));
+      return;
+    }
+
+    setIsSavingManager(true);
+    setManagerError(null);
+
+    try {
+      await request<{ id: string }>(`/api/tickets/${selectedTicket.id}/messages`, {
+        method: "POST",
+        body: JSON.stringify(parsed.data)
+      });
+      setMessageDraft("");
+      await loadTicketDetail(selectedTicket.id);
+    } catch (error) {
+      setManagerError(error instanceof Error ? error.message : t("manager.messageSaveError"));
+    } finally {
+      setIsSavingManager(false);
     }
   }
 
@@ -413,9 +522,28 @@ export function App() {
                   updateForm={updateForm}
                 />
               ) : page === "ticket-detail" && selectedTicket ? (
-                <TicketDetailView ticket={selectedTicket} t={t} />
+                <TicketDetailView
+                  isSavingManager={isSavingManager}
+                  managerDraft={managerDraft}
+                  managerError={managerError}
+                  messageDraft={messageDraft}
+                  messageVisibility={messageVisibility}
+                  onAddMessage={() => void addTicketMessage()}
+                  onMessageChange={setMessageDraft}
+                  onMessageVisibilityChange={setMessageVisibility}
+                  onSaveManager={() => void saveManagerTicket()}
+                  onUpdateManagerDraft={updateManagerDraft}
+                  role={auth.user.role}
+                  ticket={selectedTicket}
+                  t={t}
+                />
               ) : (
-                <TicketList tickets={tickets} t={t} onOpenTicket={(ticketId) => void loadTicketDetail(ticketId)} />
+                <div className="grid gap-4">
+                  {auth.user.role === "property_manager" ? (
+                    <ManagerFilters filters={filters} properties={properties} t={t} updateFilter={updateFilter} />
+                  ) : null}
+                  <TicketList tickets={tickets} t={t} onOpenTicket={(ticketId) => void loadTicketDetail(ticketId)} />
+                </div>
               )}
               {selectedTicketId && !selectedTicket && page === "ticket-detail" ? (
                 <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
@@ -675,7 +803,110 @@ function TicketList({
   );
 }
 
-function TicketDetailView({ t, ticket }: { t: (key: string) => string; ticket: TicketDetail }) {
+function ManagerFilters({
+  filters,
+  properties,
+  t,
+  updateFilter
+}: {
+  filters: { status: string; priority: string; category: string; propertyId: string };
+  properties: PropertyOption[];
+  t: (key: string) => string;
+  updateFilter: (key: "status" | "priority" | "category" | "propertyId", value: string) => void;
+}) {
+  return (
+    <div className="grid gap-3 rounded-lg border bg-muted/30 p-3 md:grid-cols-4">
+      <FilterSelect label={t("manager.filters.status")} value={filters.status} onChange={(value) => updateFilter("status", value)}>
+        <SelectItem value="all">{t("manager.filters.all")}</SelectItem>
+        {statuses.map((status) => (
+          <SelectItem key={status} value={status}>
+            {t(`ticket.status.${status}`)}
+          </SelectItem>
+        ))}
+      </FilterSelect>
+      <FilterSelect label={t("manager.filters.priority")} value={filters.priority} onChange={(value) => updateFilter("priority", value)}>
+        <SelectItem value="all">{t("manager.filters.all")}</SelectItem>
+        {priorities.map((priority) => (
+          <SelectItem key={priority} value={priority}>
+            {t(`ticket.priority.${priority}`)}
+          </SelectItem>
+        ))}
+      </FilterSelect>
+      <FilterSelect label={t("manager.filters.category")} value={filters.category} onChange={(value) => updateFilter("category", value)}>
+        <SelectItem value="all">{t("manager.filters.all")}</SelectItem>
+        {categories.map((category) => (
+          <SelectItem key={category} value={category}>
+            {t(`ticket.category.${category}`)}
+          </SelectItem>
+        ))}
+      </FilterSelect>
+      <FilterSelect label={t("manager.filters.property")} value={filters.propertyId} onChange={(value) => updateFilter("propertyId", value)}>
+        <SelectItem value="all">{t("manager.filters.all")}</SelectItem>
+        {properties.map((property) => (
+          <SelectItem key={property.id} value={property.id}>
+            {property.name}
+          </SelectItem>
+        ))}
+      </FilterSelect>
+    </div>
+  );
+}
+
+function FilterSelect({
+  children,
+  label,
+  onChange,
+  value
+}: {
+  children: ReactNode;
+  label: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <label className="grid gap-2 text-sm font-medium">
+      {label}
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>{children}</SelectContent>
+      </Select>
+    </label>
+  );
+}
+
+function TicketDetailView({
+  isSavingManager,
+  managerDraft,
+  managerError,
+  messageDraft,
+  messageVisibility,
+  onAddMessage,
+  onMessageChange,
+  onMessageVisibilityChange,
+  onSaveManager,
+  onUpdateManagerDraft,
+  role,
+  t,
+  ticket
+}: {
+  isSavingManager: boolean;
+  managerDraft: UpdateTicketRequest;
+  managerError: string | null;
+  messageDraft: string;
+  messageVisibility: MessageVisibility;
+  onAddMessage: () => void;
+  onMessageChange: (value: string) => void;
+  onMessageVisibilityChange: (value: MessageVisibility) => void;
+  onSaveManager: () => void;
+  onUpdateManagerDraft: <K extends keyof UpdateTicketRequest>(key: K, value: UpdateTicketRequest[K]) => void;
+  role: UserRole;
+  t: (key: string) => string;
+  ticket: TicketDetail;
+}) {
+  const isManager = role === "property_manager" || role === "admin";
+
   return (
     <div className="grid gap-5">
       <div className="grid gap-2">
@@ -698,6 +929,120 @@ function TicketDetailView({ t, ticket }: { t: (key: string) => string; ticket: T
         {ticket.accessDetails ? <DetailRow label={t("tickets.form.accessDetails")} value={ticket.accessDetails} /> : null}
         {ticket.attachmentNote ? <DetailRow label={t("tickets.form.attachmentNote")} value={ticket.attachmentNote} /> : null}
       </div>
+
+      {isManager ? (
+        <div className="grid gap-4 rounded-lg border bg-card p-4">
+          <h4 className="font-semibold">{t("manager.editTitle")}</h4>
+          <div className="grid gap-4 md:grid-cols-3">
+            <label className="grid gap-2 text-sm font-medium">
+              {t("tickets.table.status")}
+              <Select value={managerDraft.status ?? ticket.status} onValueChange={(value) => onUpdateManagerDraft("status", value as TicketStatus)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {statuses.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {t(`ticket.status.${status}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+            <label className="grid gap-2 text-sm font-medium">
+              {t("tickets.form.category")}
+              <Select
+                value={managerDraft.category ?? ticket.category}
+                onValueChange={(value) => onUpdateManagerDraft("category", value as TicketCategory)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {t(`ticket.category.${category}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+            <label className="grid gap-2 text-sm font-medium">
+              {t("tickets.form.priority")}
+              <Select
+                value={managerDraft.priority ?? ticket.priority}
+                onValueChange={(value) => onUpdateManagerDraft("priority", value as TicketPriority)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {priorities.map((priority) => (
+                    <SelectItem key={priority} value={priority}>
+                      {t(`ticket.priority.${priority}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="grid gap-2 text-sm font-medium">
+              {t("tickets.form.location")}
+              <Input
+                value={managerDraft.roomOrLocation ?? ""}
+                onChange={(event) => onUpdateManagerDraft("roomOrLocation", event.target.value)}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-medium">
+              {t("tickets.form.contactDetails")}
+              <Input
+                value={managerDraft.contactDetails ?? ""}
+                onChange={(event) => onUpdateManagerDraft("contactDetails", event.target.value)}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-medium">
+              {t("tickets.form.accessDetails")}
+              <Input
+                value={managerDraft.accessDetails ?? ""}
+                onChange={(event) => onUpdateManagerDraft("accessDetails", event.target.value)}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-medium">
+              {t("tickets.form.attachmentNote")}
+              <Input
+                value={managerDraft.attachmentNote ?? ""}
+                onChange={(event) => onUpdateManagerDraft("attachmentNote", event.target.value)}
+              />
+            </label>
+          </div>
+          <div className="grid gap-3">
+            <h4 className="font-semibold">{t("manager.addUpdate")}</h4>
+            <Textarea value={messageDraft} onChange={(event) => onMessageChange(event.target.value)} />
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <Select value={messageVisibility} onValueChange={(value) => onMessageVisibilityChange(value as MessageVisibility)}>
+                <SelectTrigger className="md:w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {messageVisibilities.map((visibility) => (
+                    <SelectItem key={visibility} value={visibility}>
+                      {t(`message.visibility.${visibility}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button disabled={isSavingManager} onClick={onAddMessage} type="button" variant="outline">
+                {t("manager.addUpdate")}
+              </Button>
+            </div>
+          </div>
+          {managerError ? <p className="text-sm text-destructive">{managerError}</p> : null}
+          <Button className="w-fit" disabled={isSavingManager} onClick={onSaveManager} type="button">
+            {isSavingManager ? t("manager.saving") : t("manager.saveTicket")}
+          </Button>
+        </div>
+      ) : null}
 
       <div className="grid gap-3">
         <h4 className="font-semibold">{t("tickets.messages")}</h4>

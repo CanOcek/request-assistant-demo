@@ -127,3 +127,22 @@ export type TicketDetail = TicketListItem & {
   aiSummary: string | null;
   messages: TicketMessage[];
 };
+
+export const updateTicketRequestSchema = z.object({
+  status: ticketStatusSchema.optional(),
+  category: ticketCategorySchema.optional(),
+  priority: ticketPrioritySchema.optional(),
+  roomOrLocation: z.string().max(200).optional(),
+  contactDetails: z.string().max(500).optional(),
+  accessDetails: z.string().max(500).optional(),
+  attachmentNote: z.string().max(500).optional()
+});
+
+export type UpdateTicketRequest = z.infer<typeof updateTicketRequestSchema>;
+
+export const createTicketMessageRequestSchema = z.object({
+  message: z.string().min(2).max(1200),
+  visibility: messageVisibilitySchema
+});
+
+export type CreateTicketMessageRequest = z.infer<typeof createTicketMessageRequestSchema>;

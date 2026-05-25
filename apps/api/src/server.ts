@@ -3,15 +3,25 @@ import cors from "cors";
 import { and, desc, eq } from "drizzle-orm";
 import express from "express";
 import {
+  createTicketMessageRequestSchema,
   createTicketRequestSchema,
   demoLoginRequestSchema,
+  ticketCategorySchema,
+  ticketPrioritySchema,
+  ticketStatusSchema,
+  updateTicketRequestSchema,
+  type CreateTicketMessageRequest,
   type DemoLoginResponse,
   type DemoUser,
   type HealthResponse,
   type PropertyOption,
+  type TicketCategory,
   type TicketDetail,
   type TicketListItem,
-  type TicketMessage
+  type TicketMessage,
+  type TicketPriority,
+  type TicketStatus,
+  type UpdateTicketRequest
 } from "@request-assistant/shared";
 import { createDemoToken, verifyDemoToken } from "./auth/token.js";
 import { createDatabaseClient, hasDatabaseUrl } from "./db/client.js";
@@ -63,6 +73,21 @@ function canReadTicket(user: DemoUser, ticket: { submittedByUserId: string; owne
   if (user.role === "tenant") return ticket.submittedByUserId === user.id;
   if (user.role === "owner") return ticket.ownerUserId === user.id;
   return false;
+}
+
+function canWriteTicket(user: DemoUser) {
+  return user.role === "property_manager" || user.role === "admin";
+}
+
+function visibleToUser(user: DemoUser, visibility: string) {
+  if (user.role === "property_manager" || user.role === "admin") return true;
+  if (user.role === "tenant") return visibility === "tenant_visible" || visibility === "all";
+  if (user.role === "owner") return visibility === "owner_visible" || visibility === "all";
+  return false;
+}
+
+function parseQueryValue(value: unknown) {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 app.get("/api/health", async (_req, res) => {
@@ -197,6 +222,39 @@ app.get("/api/tickets", async (req, res) => {
   const user = requireAuth(req, res);
   if (!user) return;
 
+  const status = parseQueryValue(req.query.status);
+  const priority = parseQueryValue(req.query.priority);
+  const category = parseQueryValue(req.query.category);
+  const propertyId = parseQueryValue(req.query.propertyId);
+  let statusFilter: TicketStatus | undefined;
+  let priorityFilter: TicketPriority | undefined;
+  let categoryFilter: TicketCategory | undefined;
+
+  if (status) {
+    const parsedStatus = ticketStatusSchema.safeParse(status);
+    if (!parsedStatus.success) {
+      res.status(400).json({ message: "Invalid status filter." });
+      return;
+    }
+    statusFilter = parsedStatus.data;
+  }
+  if (priority) {
+    const parsedPriority = ticketPrioritySchema.safeParse(priority);
+    if (!parsedPriority.success) {
+      res.status(400).json({ message: "Invalid priority filter." });
+      return;
+    }
+    priorityFilter = parsedPriority.data;
+  }
+  if (category) {
+    const parsedCategory = ticketCategorySchema.safeParse(category);
+    if (!parsedCategory.success) {
+      res.status(400).json({ message: "Invalid category filter." });
+      return;
+    }
+    categoryFilter = parsedCategory.data;
+  }
+
   try {
     requireDatabase();
     const { client, db } = createDatabaseClient();
@@ -205,6 +263,10 @@ app.get("/api/tickets", async (req, res) => {
       const conditions = [];
       if (user.role === "tenant") conditions.push(eq(tickets.submittedByUserId, user.id));
       if (user.role === "owner") conditions.push(eq(units.ownerUserId, user.id));
+      if (statusFilter) conditions.push(eq(tickets.status, statusFilter));
+      if (priorityFilter) conditions.push(eq(tickets.priority, priorityFilter));
+      if (categoryFilter) conditions.push(eq(tickets.category, categoryFilter));
+      if (propertyId) conditions.push(eq(tickets.propertyId, propertyId));
 
       const rows = await db
         .select({
@@ -372,12 +434,7 @@ app.get("/api/tickets/:ticketId", async (req, res) => {
         .where(eq(ticketMessages.ticketId, row.id))
         .orderBy(ticketMessages.createdAt);
 
-      const visibleMessages = messageRows.filter((message) => {
-        if (user.role === "property_manager" || user.role === "admin") return true;
-        if (user.role === "tenant") return message.visibility === "tenant_visible" || message.visibility === "all";
-        if (user.role === "owner") return message.visibility === "owner_visible" || message.visibility === "all";
-        return false;
-      });
+      const visibleMessages = messageRows.filter((message) => visibleToUser(user, message.visibility));
 
       const messages: TicketMessage[] = visibleMessages.map((message) => ({
         ...message,
@@ -415,6 +472,161 @@ app.get("/api/tickets/:ticketId", async (req, res) => {
     }
   } catch (error) {
     res.status(503).json({ message: error instanceof Error ? error.message : "Ticket unavailable." });
+  }
+});
+
+app.patch("/api/tickets/:ticketId", async (req, res) => {
+  const user = requireAuth(req, res);
+  if (!user) return;
+
+  if (!canWriteTicket(user)) {
+    res.status(403).json({ message: "Only Hausverwaltung demo users can update tickets in this sprint." });
+    return;
+  }
+
+  const parsed = updateTicketRequestSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    res.status(400).json({ message: "Invalid ticket update.", issues: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  const updateData: UpdateTicketRequest = parsed.data;
+
+  try {
+    requireDatabase();
+    const { client, db } = createDatabaseClient();
+
+    try {
+      const [updated] = await db
+        .update(tickets)
+        .set({
+          ...updateData,
+          updatedAt: new Date()
+        })
+        .where(eq(tickets.id, req.params.ticketId))
+        .returning({ id: tickets.id });
+
+      if (!updated) {
+        res.status(404).json({ message: "Ticket not found." });
+        return;
+      }
+
+      res.json({ id: updated.id });
+    } finally {
+      await client.end();
+    }
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Ticket update unavailable." });
+  }
+});
+
+app.get("/api/tickets/:ticketId/messages", async (req, res) => {
+  const user = requireAuth(req, res);
+  if (!user) return;
+
+  try {
+    requireDatabase();
+    const { client, db } = createDatabaseClient();
+
+    try {
+      const [ticket] = await db
+        .select({
+          submittedByUserId: tickets.submittedByUserId,
+          ownerUserId: units.ownerUserId
+        })
+        .from(tickets)
+        .leftJoin(units, eq(tickets.unitId, units.id))
+        .where(eq(tickets.id, req.params.ticketId))
+        .limit(1);
+
+      if (!ticket) {
+        res.status(404).json({ message: "Ticket not found." });
+        return;
+      }
+
+      if (!canReadTicket(user, ticket)) {
+        res.status(403).json({ message: "You cannot view messages for this ticket." });
+        return;
+      }
+
+      const rows = await db
+        .select({
+          id: ticketMessages.id,
+          authorName: users.name,
+          message: ticketMessages.message,
+          visibility: ticketMessages.visibility,
+          createdAt: ticketMessages.createdAt
+        })
+        .from(ticketMessages)
+        .innerJoin(users, eq(ticketMessages.authorUserId, users.id))
+        .where(eq(ticketMessages.ticketId, req.params.ticketId))
+        .orderBy(ticketMessages.createdAt);
+
+      const messages: TicketMessage[] = rows
+        .filter((message) => visibleToUser(user, message.visibility))
+        .map((message) => ({
+          ...message,
+          createdAt: message.createdAt.toISOString()
+        }));
+
+      res.json({ messages });
+    } finally {
+      await client.end();
+    }
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Messages unavailable." });
+  }
+});
+
+app.post("/api/tickets/:ticketId/messages", async (req, res) => {
+  const user = requireAuth(req, res);
+  if (!user) return;
+
+  if (!canWriteTicket(user)) {
+    res.status(403).json({ message: "Only Hausverwaltung demo users can add ticket updates in this sprint." });
+    return;
+  }
+
+  const parsed = createTicketMessageRequestSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    res.status(400).json({ message: "Invalid message.", issues: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  const data: CreateTicketMessageRequest = parsed.data;
+
+  try {
+    requireDatabase();
+    const { client, db } = createDatabaseClient();
+
+    try {
+      const [ticket] = await db.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, req.params.ticketId)).limit(1);
+
+      if (!ticket) {
+        res.status(404).json({ message: "Ticket not found." });
+        return;
+      }
+
+      const [created] = await db
+        .insert(ticketMessages)
+        .values({
+          ticketId: req.params.ticketId,
+          authorUserId: user.id,
+          message: data.message,
+          visibility: data.visibility
+        })
+        .returning({ id: ticketMessages.id });
+
+      await db.update(tickets).set({ updatedAt: new Date() }).where(eq(tickets.id, req.params.ticketId));
+
+      res.status(201).json({ id: created.id });
+    } finally {
+      await client.end();
+    }
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "Message creation unavailable." });
   }
 });
 
