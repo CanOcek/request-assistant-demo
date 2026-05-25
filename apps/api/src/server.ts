@@ -3,6 +3,7 @@ import cors from "cors";
 import { and, desc, eq } from "drizzle-orm";
 import express from "express";
 import {
+  aiTicketExtractRequestSchema,
   createTicketMessageRequestSchema,
   createTicketRequestSchema,
   demoLoginRequestSchema,
@@ -23,6 +24,7 @@ import {
   type TicketStatus,
   type UpdateTicketRequest
 } from "@request-assistant/shared";
+import { extractTicketFields } from "./ai/ticketExtraction.js";
 import { createDemoToken, verifyDemoToken } from "./auth/token.js";
 import { createDatabaseClient, hasDatabaseUrl } from "./db/client.js";
 import { properties, ticketMessages, tickets, units, users } from "./db/schema.js";
@@ -163,6 +165,30 @@ app.get("/api/me", (req, res) => {
   if (!user) return;
 
   res.json({ user });
+});
+
+app.post("/api/ai/tickets/extract", async (req, res) => {
+  const user = requireAuth(req, res);
+  if (!user) return;
+
+  if (user.role !== "tenant" && user.role !== "property_manager") {
+    res.status(403).json({ message: "This demo role cannot use AI ticket extraction." });
+    return;
+  }
+
+  const parsed = aiTicketExtractRequestSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    res.status(400).json({ message: "Invalid AI extraction input.", issues: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  try {
+    const extraction = await extractTicketFields(parsed.data.input);
+    res.json({ extraction });
+  } catch (error) {
+    res.status(503).json({ message: error instanceof Error ? error.message : "AI extraction unavailable." });
+  }
 });
 
 app.get("/api/properties", async (req, res) => {

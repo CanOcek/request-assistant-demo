@@ -146,3 +146,24 @@ export const createTicketMessageRequestSchema = z.object({
 });
 
 export type CreateTicketMessageRequest = z.infer<typeof createTicketMessageRequestSchema>;
+
+export const aiTicketExtractRequestSchema = z.object({
+  input: z.string().min(10).max(4000)
+});
+
+export type AiTicketExtractRequest = z.infer<typeof aiTicketExtractRequestSchema>;
+
+export const aiTicketExtractResponseSchema = z.object({
+  suggestedTitle: z.string().min(3).max(140),
+  cleanDescription: z.string().min(10).max(4000),
+  category: ticketCategorySchema,
+  priority: ticketPrioritySchema,
+  roomOrLocation: z.string().max(200).nullable(),
+  missingFields: z.array(z.string()).max(8),
+  followUpQuestions: z.array(z.string()).max(8),
+  summary: z.string().min(5).max(800),
+  confidence: z.number().min(0).max(1),
+  source: z.enum(["openai", "mock"])
+});
+
+export type AiTicketExtractResponse = z.infer<typeof aiTicketExtractResponseSchema>;

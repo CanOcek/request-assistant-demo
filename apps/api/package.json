@@ -19,6 +19,7 @@
     "dotenv": "^16.5.0",
     "drizzle-orm": "^0.45.2",
     "express": "^4.21.2",
+    "openai": "^6.39.0",
     "postgres": "^3.4.9"
   },
   "devDependencies": {

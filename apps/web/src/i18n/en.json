@@ -29,6 +29,19 @@
     "connected": "Database connected",
     "error": "Database error"
   },
+  "ai": {
+    "title": "AI-assisted intake",
+    "description": "Paste an unstructured tenant message and let AI prefill the structured ticket fields.",
+    "structure": "Structure with AI",
+    "structuring": "Structuring...",
+    "realAi": "OpenAI",
+    "mockAi": "Demo fallback",
+    "summary": "Summary",
+    "confidence": "Confidence",
+    "followUps": "Follow-up questions",
+    "validationError": "Enter at least 10 characters before structuring.",
+    "extractError": "Could not structure the request."
+  },
   "nav": {
     "newRequest": "New request",
     "myTickets": "My tickets",

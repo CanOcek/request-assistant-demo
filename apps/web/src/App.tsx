@@ -1,6 +1,7 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   appName,
+  aiTicketExtractRequestSchema,
   createTicketRequestSchema,
   createTicketMessageRequestSchema,
   messageVisibilitySchema,
@@ -10,6 +11,7 @@ import {
   updateTicketRequestSchema,
   type CreateTicketMessageRequest,
   type CreateTicketRequest,
+  type AiTicketExtractResponse,
   type DemoLoginResponse,
   type DemoUser,
   type HealthResponse,
@@ -93,6 +95,10 @@ export function App() {
   const [dataError, setDataError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aiInput, setAiInput] = useState("");
+  const [aiResult, setAiResult] = useState<AiTicketExtractResponse | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [isStructuring, setIsStructuring] = useState(false);
   const [filters, setFilters] = useState({
     status: "all",
     priority: "all",
@@ -272,6 +278,40 @@ export function App() {
       setFormError(error instanceof Error ? error.message : t("tickets.form.submitError"));
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function structureWithAi() {
+    setAiError(null);
+
+    const parsed = aiTicketExtractRequestSchema.safeParse({ input: aiInput.trim() });
+
+    if (!parsed.success) {
+      setAiError(t("ai.validationError"));
+      return;
+    }
+
+    setIsStructuring(true);
+
+    try {
+      const response = await request<{ extraction: AiTicketExtractResponse }>("/api/ai/tickets/extract", {
+        method: "POST",
+        body: JSON.stringify(parsed.data)
+      });
+
+      setAiResult(response.extraction);
+      setForm((current) => ({
+        ...current,
+        title: response.extraction.suggestedTitle,
+        description: response.extraction.cleanDescription,
+        category: response.extraction.category,
+        priority: response.extraction.priority,
+        roomOrLocation: response.extraction.roomOrLocation ?? current.roomOrLocation
+      }));
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : t("ai.extractError"));
+    } finally {
+      setIsStructuring(false);
     }
   }
 
@@ -515,8 +555,14 @@ export function App() {
                   currentUnitOptions={currentUnitOptions}
                   form={form}
                   formError={formError}
+                  aiError={aiError}
+                  aiInput={aiInput}
+                  aiResult={aiResult}
                   isSubmitting={isSubmitting}
+                  isStructuring={isStructuring}
                   onSubmit={submitTicket}
+                  onAiInputChange={setAiInput}
+                  onStructureWithAi={() => void structureWithAi()}
                   properties={properties}
                   t={t}
                   updateForm={updateForm}
@@ -620,26 +666,77 @@ export function App() {
 }
 
 function TicketForm({
+  aiError,
+  aiInput,
+  aiResult,
   currentUnitOptions,
   form,
   formError,
   isSubmitting,
+  isStructuring,
+  onAiInputChange,
   onSubmit,
+  onStructureWithAi,
   properties,
   t,
   updateForm
 }: {
+  aiError: string | null;
+  aiInput: string;
+  aiResult: AiTicketExtractResponse | null;
   currentUnitOptions: PropertyOption["units"];
   form: TicketFormState;
   formError: string | null;
   isSubmitting: boolean;
+  isStructuring: boolean;
+  onAiInputChange: (value: string) => void;
   onSubmit: (event: FormEvent) => void;
+  onStructureWithAi: () => void;
   properties: PropertyOption[];
   t: (key: string) => string;
   updateForm: <K extends keyof TicketFormState>(key: K, value: TicketFormState[K]) => void;
 }) {
   return (
     <form className="grid gap-4" onSubmit={onSubmit}>
+      <div className="grid gap-3 rounded-lg border bg-muted/30 p-4">
+        <div className="grid gap-1">
+          <h3 className="font-semibold">{t("ai.title")}</h3>
+          <p className="text-sm text-muted-foreground">{t("ai.description")}</p>
+        </div>
+        <Textarea value={aiInput} onChange={(event) => onAiInputChange(event.target.value)} />
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <Button disabled={isStructuring} onClick={onStructureWithAi} type="button" variant="outline">
+            {isStructuring ? t("ai.structuring") : t("ai.structure")}
+          </Button>
+          {aiResult ? (
+            <Badge variant={aiResult.source === "openai" ? "default" : "outline"}>
+              {aiResult.source === "openai" ? t("ai.realAi") : t("ai.mockAi")}
+            </Badge>
+          ) : null}
+        </div>
+        {aiError ? <p className="text-sm text-destructive">{aiError}</p> : null}
+        {aiResult ? (
+          <div className="grid gap-2 rounded-md border bg-card p-3 text-sm">
+            <p>
+              <span className="font-medium">{t("ai.summary")}:</span> {aiResult.summary}
+            </p>
+            <p>
+              <span className="font-medium">{t("ai.confidence")}:</span> {Math.round(aiResult.confidence * 100)}%
+            </p>
+            {aiResult.followUpQuestions.length ? (
+              <div className="grid gap-1">
+                <span className="font-medium">{t("ai.followUps")}</span>
+                <ul className="list-disc pl-5 text-muted-foreground">
+                  {aiResult.followUpQuestions.map((question) => (
+                    <li key={question}>{question}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium">
           {t("tickets.form.property")}

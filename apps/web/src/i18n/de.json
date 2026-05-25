@@ -29,6 +29,19 @@
     "connected": "Datenbank verbunden",
     "error": "Datenbankfehler"
   },
+  "ai": {
+    "title": "KI-gestuetzte Erfassung",
+    "description": "Fuege eine unstrukturierte Mieternachricht ein und lasse die Ticket-Felder vorbefuellen.",
+    "structure": "Mit KI strukturieren",
+    "structuring": "Strukturiert...",
+    "realAi": "OpenAI",
+    "mockAi": "Demo-Fallback",
+    "summary": "Zusammenfassung",
+    "confidence": "Sicherheit",
+    "followUps": "Rueckfragen",
+    "validationError": "Gib mindestens 10 Zeichen ein, bevor strukturiert wird.",
+    "extractError": "Die Anfrage konnte nicht strukturiert werden."
+  },
   "nav": {
     "newRequest": "Neue Anfrage",
     "myTickets": "Meine Tickets",
