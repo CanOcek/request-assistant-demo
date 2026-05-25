@@ -36,6 +36,37 @@
     "approvals": "Approvals",
     "admin": "Admin setup"
   },
+  "tickets": {
+    "tenantTitle": "Maintenance requests",
+    "dashboardTitle": "Ticket dashboard",
+    "messages": "Updates",
+    "form": {
+      "property": "Property",
+      "unit": "Unit",
+      "selectProperty": "Select property",
+      "selectUnit": "Select unit",
+      "title": "Title",
+      "description": "Description",
+      "category": "Category",
+      "priority": "Priority",
+      "location": "Room or location",
+      "contactDetails": "Contact details",
+      "accessDetails": "Access details",
+      "attachmentNote": "Photo or attachment note",
+      "submit": "Submit request",
+      "submitting": "Submitting...",
+      "validationError": "Please complete the required fields before submitting.",
+      "submitError": "Could not submit the request."
+    },
+    "table": {
+      "ticket": "Ticket",
+      "category": "Category",
+      "priority": "Priority",
+      "status": "Status",
+      "action": "Action",
+      "open": "Open"
+    }
+  },
   "roles": {
     "tenant": "Tenant",
     "manager": "Hausverwaltung",
@@ -86,6 +117,8 @@
     "page": "Page",
     "role": "Role",
     "purpose": "Purpose",
-    "empty": "No records yet"
+    "empty": "No records yet",
+    "loading": "Loading...",
+    "loadError": "Could not load data."
   }
 }

@@ -36,6 +36,37 @@
     "approvals": "Freigaben",
     "admin": "Admin-Einrichtung"
   },
+  "tickets": {
+    "tenantTitle": "Instandhaltungsanfragen",
+    "dashboardTitle": "Ticket-Dashboard",
+    "messages": "Updates",
+    "form": {
+      "property": "Objekt",
+      "unit": "Einheit",
+      "selectProperty": "Objekt auswaehlen",
+      "selectUnit": "Einheit auswaehlen",
+      "title": "Titel",
+      "description": "Beschreibung",
+      "category": "Kategorie",
+      "priority": "Prioritaet",
+      "location": "Raum oder Ort",
+      "contactDetails": "Kontaktdetails",
+      "accessDetails": "Zugangsinformationen",
+      "attachmentNote": "Foto- oder Anhangsnotiz",
+      "submit": "Anfrage einreichen",
+      "submitting": "Wird eingereicht...",
+      "validationError": "Bitte fuelle die Pflichtfelder vor dem Absenden aus.",
+      "submitError": "Die Anfrage konnte nicht eingereicht werden."
+    },
+    "table": {
+      "ticket": "Ticket",
+      "category": "Kategorie",
+      "priority": "Prioritaet",
+      "status": "Status",
+      "action": "Aktion",
+      "open": "Oeffnen"
+    }
+  },
   "roles": {
     "tenant": "Mieter",
     "manager": "Hausverwaltung",
@@ -86,6 +117,8 @@
     "page": "Seite",
     "role": "Rolle",
     "purpose": "Zweck",
-    "empty": "Noch keine Eintraege"
+    "empty": "Noch keine Eintraege",
+    "loading": "Laedt...",
+    "loadError": "Daten konnten nicht geladen werden."
   }
 }

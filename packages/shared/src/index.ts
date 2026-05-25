@@ -63,3 +63,67 @@ export type DemoLoginResponse = {
   token: string;
   user: DemoUser;
 };
+
+export const createTicketRequestSchema = z.object({
+  propertyId: z.string().uuid(),
+  unitId: z.string().uuid().optional(),
+  title: z.string().min(3).max(140),
+  description: z.string().min(10).max(4000),
+  category: ticketCategorySchema,
+  priority: ticketPrioritySchema,
+  roomOrLocation: z.string().max(200).optional(),
+  contactDetails: z.string().max(500).optional(),
+  accessDetails: z.string().max(500).optional(),
+  attachmentNote: z.string().max(500).optional()
+});
+
+export type CreateTicketRequest = z.infer<typeof createTicketRequestSchema>;
+
+export type UnitOption = {
+  id: string;
+  label: string;
+  floor: string | null;
+};
+
+export type PropertyOption = {
+  id: string;
+  name: string;
+  address: string;
+  units: UnitOption[];
+};
+
+export type TicketListItem = {
+  id: string;
+  title: string;
+  description: string;
+  category: TicketCategory;
+  priority: TicketPriority;
+  status: TicketStatus;
+  propertyName: string;
+  unitLabel: string | null;
+  roomOrLocation: string | null;
+  submittedByName: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TicketMessage = {
+  id: string;
+  authorName: string;
+  message: string;
+  visibility: MessageVisibility;
+  createdAt: string;
+};
+
+export type TicketDetail = TicketListItem & {
+  propertyId: string;
+  unitId: string | null;
+  propertyAddress: string;
+  contactDetails: string | null;
+  accessDetails: string | null;
+  attachmentNote: string | null;
+  approvalRequired: boolean;
+  approvalStatus: ApprovalStatus | null;
+  aiSummary: string | null;
+  messages: TicketMessage[];
+};
