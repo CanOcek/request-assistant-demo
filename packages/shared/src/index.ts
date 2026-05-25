@@ -148,7 +148,8 @@ export const createTicketMessageRequestSchema = z.object({
 export type CreateTicketMessageRequest = z.infer<typeof createTicketMessageRequestSchema>;
 
 export const aiTicketExtractRequestSchema = z.object({
-  input: z.string().min(10).max(4000)
+  input: z.string().min(10).max(4000),
+  uiLanguage: z.enum(["en", "de"]).optional()
 });
 
 export type AiTicketExtractRequest = z.infer<typeof aiTicketExtractRequestSchema>;

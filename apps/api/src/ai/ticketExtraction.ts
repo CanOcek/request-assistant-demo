@@ -8,19 +8,21 @@ import {
 } from "@request-assistant/shared";
 
 const ticketExtractionSchema = aiTicketExtractResponseSchema.omit({ source: true });
+type UiLanguage = "en" | "de";
 
-export async function extractTicketFields(input: string): Promise<AiTicketExtractResponse> {
+export async function extractTicketFields(input: string, uiLanguage: UiLanguage = "en"): Promise<AiTicketExtractResponse> {
   if (!process.env.OPENAI_API_KEY) {
-    return mockExtractTicketFields(input);
+    return mockExtractTicketFields(input, uiLanguage);
   }
 
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const model = process.env.OPENAI_MODEL ?? "gpt-5.4-mini";
+  const responseLanguage = uiLanguage === "de" ? "German" : "English";
 
   const response = await client.responses.parse({
     model,
     instructions:
-      "Extract a German property-management maintenance ticket from tenant text. Return only the structured fields. Use practical categories and priorities for a Hausverwaltung. Ask follow-up questions for missing operational details like location, access, contact timing, photos, or urgency.",
+      `Extract a property-management maintenance ticket from tenant text. Return only the structured fields. Use practical categories and priorities for a Hausverwaltung. Write all natural-language response fields in ${responseLanguage}: suggestedTitle, cleanDescription, followUpQuestions, and summary. Ask follow-up questions for missing operational details like location, access, contact timing, photos, or urgency.`,
     input,
     text: {
       format: zodTextFormat(ticketExtractionSchema, "maintenance_ticket_extraction")
@@ -39,7 +41,7 @@ export async function extractTicketFields(input: string): Promise<AiTicketExtrac
   });
 }
 
-function mockExtractTicketFields(input: string): AiTicketExtractResponse {
+function mockExtractTicketFields(input: string, uiLanguage: UiLanguage): AiTicketExtractResponse {
   const lower = input.toLowerCase();
   const category = inferCategory(lower);
   const priority = inferPriority(lower, category);
@@ -49,28 +51,41 @@ function mockExtractTicketFields(input: string): AiTicketExtractResponse {
 
   if (!roomOrLocation) {
     missingFields.push("roomOrLocation");
-    followUpQuestions.push("Which room or exact location is affected?");
+    followUpQuestions.push(
+      uiLanguage === "de" ? "Welcher Raum oder genaue Ort ist betroffen?" : "Which room or exact location is affected?"
+    );
   }
 
   if (!lower.includes("photo") && !lower.includes("foto") && !lower.includes("bild")) {
     missingFields.push("photos");
-    followUpQuestions.push("Can you add a photo or short note describing visible damage?");
+    followUpQuestions.push(
+      uiLanguage === "de"
+        ? "Kannst du ein Foto oder eine kurze Notiz zu sichtbaren Schaeden hinzufuegen?"
+        : "Can you add a photo or short note describing visible damage?"
+    );
   }
 
   if (!lower.includes("access") && !lower.includes("zugang") && !lower.includes("key") && !lower.includes("schluessel")) {
     missingFields.push("accessDetails");
-    followUpQuestions.push("How can a service provider access the apartment or affected area?");
+    followUpQuestions.push(
+      uiLanguage === "de"
+        ? "Wie kann ein Dienstleister die Wohnung oder den betroffenen Bereich erreichen?"
+        : "How can a service provider access the apartment or affected area?"
+    );
   }
 
   return {
-    suggestedTitle: makeTitle(input, category),
+    suggestedTitle: makeTitle(input, category, uiLanguage),
     cleanDescription: input.trim(),
     category,
     priority,
     roomOrLocation,
     missingFields,
     followUpQuestions,
-    summary: `Maintenance request categorized as ${category.replaceAll("_", " ")} with ${priority} priority.`,
+    summary:
+      uiLanguage === "de"
+        ? `Die Anfrage wurde als ${formatCategory(category, uiLanguage)} mit Prioritaet ${formatPriority(priority, uiLanguage)} eingestuft.`
+        : `Maintenance request categorized as ${formatCategory(category, uiLanguage)} with ${formatPriority(priority, uiLanguage)} priority.`,
     confidence: 0.72,
     source: "mock"
   };
@@ -115,7 +130,7 @@ function inferLocation(input: string) {
   return knownLocations.find((location) => input.includes(location)) ?? null;
 }
 
-function makeTitle(input: string, category: TicketCategory) {
+function makeTitle(input: string, category: TicketCategory, uiLanguage: UiLanguage) {
   const firstSentence = input
     .trim()
     .split(/[.!?]/)[0]
@@ -124,5 +139,55 @@ function makeTitle(input: string, category: TicketCategory) {
 
   if (firstSentence.length >= 8) return firstSentence;
 
-  return `Maintenance request: ${category.replaceAll("_", " ")}`;
+  return uiLanguage === "de"
+    ? `Instandhaltungsanfrage: ${formatCategory(category, uiLanguage)}`
+    : `Maintenance request: ${formatCategory(category, uiLanguage)}`;
+}
+
+function formatCategory(category: TicketCategory, uiLanguage: UiLanguage) {
+  const labels: Record<UiLanguage, Record<TicketCategory, string>> = {
+    en: {
+      heating: "heating",
+      water_damage: "water damage",
+      internet_tv: "internet/TV",
+      electricity: "electricity",
+      cleaning: "cleaning",
+      access: "access",
+      noise: "noise",
+      general_repair: "general repair",
+      other: "other"
+    },
+    de: {
+      heating: "Heizung",
+      water_damage: "Wasserschaden",
+      internet_tv: "Internet/TV",
+      electricity: "Strom",
+      cleaning: "Reinigung",
+      access: "Zugang",
+      noise: "Laerm",
+      general_repair: "allgemeine Reparatur",
+      other: "sonstige Anfrage"
+    }
+  };
+
+  return labels[uiLanguage][category];
+}
+
+function formatPriority(priority: TicketPriority, uiLanguage: UiLanguage) {
+  const labels: Record<UiLanguage, Record<TicketPriority, string>> = {
+    en: {
+      low: "low",
+      medium: "medium",
+      high: "high",
+      urgent: "urgent"
+    },
+    de: {
+      low: "niedrig",
+      medium: "mittel",
+      high: "hoch",
+      urgent: "dringend"
+    }
+  };
+
+  return labels[uiLanguage][priority];
 }

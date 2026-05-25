@@ -36,9 +36,11 @@
     "structuring": "Strukturiert...",
     "realAi": "OpenAI",
     "mockAi": "Demo-Fallback",
+    "suggestionsTitle": "Vorgeschlagene Ticket-Daten",
     "summary": "Zusammenfassung",
     "confidence": "Sicherheit",
     "followUps": "Rueckfragen",
+    "notDetected": "Noch nicht erkannt",
     "validationError": "Gib mindestens 10 Zeichen ein, bevor strukturiert wird.",
     "extractError": "Die Anfrage konnte nicht strukturiert werden."
   },

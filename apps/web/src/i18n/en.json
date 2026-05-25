@@ -36,9 +36,11 @@
     "structuring": "Structuring...",
     "realAi": "OpenAI",
     "mockAi": "Demo fallback",
+    "suggestionsTitle": "Suggested ticket details",
     "summary": "Summary",
     "confidence": "Confidence",
     "followUps": "Follow-up questions",
+    "notDetected": "Not detected yet",
     "validationError": "Enter at least 10 characters before structuring.",
     "extractError": "Could not structure the request."
   },

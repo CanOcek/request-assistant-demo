@@ -306,8 +306,9 @@ export function App() {
 
   async function structureWithAi() {
     setAiError(null);
+    const uiLanguage = (i18n.resolvedLanguage ?? i18n.language).startsWith("de") ? "de" : "en";
 
-    const parsed = aiTicketExtractRequestSchema.safeParse({ input: aiInput.trim() });
+    const parsed = aiTicketExtractRequestSchema.safeParse({ input: aiInput.trim(), uiLanguage });
 
     if (!parsed.success) {
       setAiError(t("ai.validationError"));
@@ -815,17 +816,35 @@ function TicketForm({
         </div>
         {aiError ? <p className="text-sm text-destructive">{aiError}</p> : null}
         {aiResult ? (
-          <div className="grid gap-2 rounded-md border bg-card p-3 text-sm">
+          <div className="grid gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-50">
+            <div className="grid gap-1">
+              <p className="font-semibold">{t("ai.suggestionsTitle")}</p>
+              <p>
+                <span className="font-semibold">{t("tickets.form.title")}:</span> {aiResult.suggestedTitle}
+              </p>
+              <p>
+                <span className="font-semibold">{t("tickets.form.category")}:</span>{" "}
+                {t(`ticket.category.${aiResult.category}`)}
+              </p>
+              <p>
+                <span className="font-semibold">{t("tickets.form.priority")}:</span>{" "}
+                {t(`ticket.priority.${aiResult.priority}`)}
+              </p>
+              <p>
+                <span className="font-semibold">{t("tickets.form.location")}:</span>{" "}
+                {aiResult.roomOrLocation ?? t("ai.notDetected")}
+              </p>
+            </div>
             <p>
-              <span className="font-medium">{t("ai.summary")}:</span> {aiResult.summary}
+              <span className="font-semibold">{t("ai.summary")}:</span> {aiResult.summary}
             </p>
             <p>
-              <span className="font-medium">{t("ai.confidence")}:</span> {Math.round(aiResult.confidence * 100)}%
+              <span className="font-semibold">{t("ai.confidence")}:</span> {Math.round(aiResult.confidence * 100)}%
             </p>
             {aiResult.followUpQuestions.length ? (
               <div className="grid gap-1">
-                <span className="font-medium">{t("ai.followUps")}</span>
-                <ul className="list-disc pl-5 text-muted-foreground">
+                <span className="font-semibold">{t("ai.followUps")}</span>
+                <ul className="list-disc pl-5">
                   {aiResult.followUpQuestions.map((question) => (
                     <li key={question}>{question}</li>
                   ))}

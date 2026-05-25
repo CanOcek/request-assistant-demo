@@ -187,7 +187,7 @@ app.post("/api/ai/tickets/extract", async (req, res) => {
   }
 
   try {
-    const extraction = await extractTicketFields(parsed.data.input);
+    const extraction = await extractTicketFields(parsed.data.input, parsed.data.uiLanguage);
     res.json({ extraction });
   } catch (error) {
     res.status(503).json({ message: error instanceof Error ? error.message : "AI extraction unavailable." });
